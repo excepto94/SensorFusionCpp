@@ -11,15 +11,51 @@ struct MotionModel {
     Eigen::MatrixXd F;
     Eigen::MatrixXd Q;
     std::function<Eigen::VectorXd(Eigen::VectorXd)> f;
+
+    // Constructor to set dimensions and initialize matrices
+    MotionModel(int dimension) : d(dimension), F(dimension, dimension), Q(dimension, dimension) {
+        // Ensure that f has the correct size
+        f = [this](Eigen::VectorXd x) {
+            // Check if the input size matches d
+            assert(x.size() == this->d && "Input size mismatch in function f");
+
+            // Placeholder implementation of f, you can replace it with your desired function
+            Eigen::VectorXd result = F * x;
+            return result;
+        };
+    }
+};
+
+struct SensorModel {
+    int d1;
+    int d2;
+    Eigen::MatrixXd H;
+    Eigen::MatrixXd R;
+    std::function<Eigen::VectorXd(Eigen::VectorXd)> h;
+
+    // Constructor to set dimensions and initialize matrices
+    SensorModel(int dimension1, int dimension2) : d1(dimension1), d2(dimension2), H(dimension2, dimension1), R(dimension2, dimension2) {
+        // Ensure that h has the correct size
+        h = [this](Eigen::VectorXd x) {
+            // Check if the input size matches d2
+            assert(x.size() == this->d2 && "Input size mismatch in function h");
+
+            // Placeholder implementation of h, you can replace it with your desired function
+            Eigen::VectorXd result = H * x;
+            return result;
+        };
+    }
 };
 
 class MotionData {
     private:
-        static const int MAXSIZE = 4095;
+        static const int MAXSIZE = 4096;
     protected:
         int lengthOfData;
     public:
         int t[MAXSIZE];
+        double position_x[MAXSIZE];
+        double position_y[MAXSIZE];
         double velocity_x[MAXSIZE];
         double velocity_y[MAXSIZE];
         double acceleration_x[MAXSIZE];
@@ -34,6 +70,8 @@ class MotionData {
 
         for (int i = 0; i < n; ++i) {
             t[i] = 0;
+            position_x[i] = 0.0;
+            position_y[i] = 0.0;
             velocity_x[i] = 0.0;
             velocity_y[i] = 0.0;
             acceleration_x[i] = 0.0;
@@ -44,63 +82,52 @@ class MotionData {
 
 MotionModel cvmodel(double T, double sigma) {
     int d = 4;
+    
+    MotionModel motionModel(d);
+    motionModel.d = d;
 
-    Eigen::MatrixXd F(4, 4);
-    F << 1, 0, T, 0,
+    motionModel.F <<
+        1, 0, T, 0,
         0, 1, 0, T,
         0, 0, 1, 0,
         0, 0, 0, 1;
 
-    auto f = [F](Eigen::VectorXd x) -> Eigen::VectorXd {
-        return F * x;
-        };
+    motionModel.f = [motionModel](Eigen::VectorXd x) -> Eigen::VectorXd {return motionModel.F * x;};
 
-    double T4 = T * T * T * T / 3;
+    double T4 = T * T * T * T / 4;
     double T3 = T * T * T / 2;
-    double T2 = T * T / 1;
+    double T2 = T * T;
 
-    Eigen::MatrixXd Q(4, 4);
-    Q << T4, 0,  T3, 0,
-         0,  T4, 0,  T3,
-         T3, 0,  T2, 0,
-         0,  T3, 0,  T2;
+    motionModel.Q << 
+        T4, 0,  T3, 0,
+        0,  T4, 0,  T3,
+        T3, 0,  T2, 0,
+        0,  T3, 0,  T2;
+    motionModel.Q = motionModel.Q * sigma;
 
-    return { d, F, Q, f };
+    return motionModel;
 }
 
-Eigen::VectorXd calculateX(const Eigen::VectorXd& x, double T) {
-    Eigen::VectorXd newX = x; // Copy the state vector
+SensorModel velocitySensorModel(double T, double sigma) {
+    int d1 = 4;
+    int d2 = 2;
+    SensorModel sensorModel(d1, d2);
 
-    newX(0) += T * x(2); // Update position_x
-    newX(1) += T * x(3); // Update position_y
+    sensorModel.H <<
+        0, 0, 1, 0,
+        0, 0, 0, 1;
 
-    return newX;
+    sensorModel.h = [sensorModel](Eigen::VectorXd x) -> Eigen::VectorXd {return sensorModel.H * x;};
+
+    double sigma2 = sigma*sigma;
+    sensorModel.R << 
+        sigma2, 0,
+        0, sigma2;
+
+    return sensorModel;
 }
 
-Eigen::MatrixXd calculateP(const Eigen::MatrixXd& P, double T) {
-    Eigen::MatrixXd newP = P; // Copy the covariance matrix
-
-    newP(0, 0) += T * (P(2, 2) + P(0, 2)) + T * P(0, 2);
-    newP(1, 1) += T * (P(3, 3) + P(1, 3)) + T * P(1, 3);
-    newP(0, 1) += T * P(2, 3);
-    newP(1, 0) += T * P(3, 2);
-
-    newP(2, 0) += T * P(2, 2);
-    newP(3, 1) += T * P(3, 3);
-
-    newP(0, 2) += T * P(2, 2);
-    newP(1, 3) += T * P(3, 3);
-
-    newP(2, 0) += T * P(2, 2);
-    newP(3, 1) += T * P(3, 3);
-
-    newP(2, 2) += T * T;
-    newP(3, 3) += T * T;
-
-    return newP;
-}
-
-Eigen::MatrixXd generateRandomMeasurement(const Eigen::MatrixXd& trueVelocity, double noise) {
+Eigen::MatrixXd generateMeasurement(const Eigen::MatrixXd& trueVelocity, double noise) {
     Eigen::MatrixXd noisyVelocity = trueVelocity; // Initialize with true velocity
 
     for (int i = 0; i < trueVelocity.cols(); ++i) {
@@ -114,59 +141,41 @@ Eigen::MatrixXd generateRandomMeasurement(const Eigen::MatrixXd& trueVelocity, d
     return noisyVelocity;
 }
 
-Eigen::MatrixXd generateMotionData(int steps, double T, double noise) {
-    // Define CV model matrices
-    Eigen::MatrixXd F(4, 4); // State transition matrix
-    F << 1, 0, T, 0,
-        0, 1, 0, T,
-        0, 0, 1, 0,
-        0, 0, 0, 1;
+Eigen::MatrixXd runKalmanFilter(MotionModel motionModel, SensorModel sensorModel, Eigen::MatrixXd noisyVelocity, Eigen::VectorXd x, Eigen::MatrixXd P, int steps) {
+    Eigen::MatrixXd estimatedVelocity = noisyVelocity;
+    Eigen::VectorXd measurement(sensorModel.d2);
 
-    Eigen::VectorXd x(4); // State vector [position_x, position_y, velocity_x, velocity_y]
-    x << 0, 0, 1, 1;
+    for (int i = 0; i < steps; ++i) { // Loop for a few iterations
+        
+        measurement << noisyVelocity(2,i), noisyVelocity(3,i);
 
-    Eigen::MatrixXd P = Eigen::MatrixXd::Identity(4, 4);
+        // Prediction step
+        x = motionModel.f(x);
+        P = motionModel.F * P * motionModel.F.transpose() + motionModel.Q;
 
-    Eigen::MatrixXd data(4, steps);
+        // Update step
+        Eigen::VectorXd y = measurement - sensorModel.h(x);
+        Eigen::MatrixXd S = sensorModel.H * P * sensorModel.H.transpose() + sensorModel.R;
+        Eigen::MatrixXd K = P * sensorModel.H.transpose() * S.inverse();
 
-    for (int i = 0; i < steps; ++i) {
-        // Prediction step (simulate motion)
-        x = F * x;
-        // Add process noise to the state
-        for (int j = 0; j < x.size(); ++j) {
-            x(j) += noise * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
+        x = x + K * y;
+        P = (Eigen::MatrixXd::Identity(motionModel.d, motionModel.d) - K * sensorModel.H) * P;
+
+        for (int j = 0; j < motionModel.d; j++) {
+            estimatedVelocity(j, i) = x(j);
         }
-
-        data.col(i) = x;
+        std::cout
+            << estimatedVelocity(0,i) << " , "
+            << estimatedVelocity(1,i) << " , "
+            << estimatedVelocity(2,i) << " , "
+            << estimatedVelocity(3,i) << std::endl;
     }
-
-    return data;
+    
+    return estimatedVelocity;
 }
 
-void kalmanFilter() {
-    Eigen::VectorXd x(4); // State vector [position_x, position_y, velocity_x, velocity_y]
-    x << 0, 0, 1, 1;
-
-    Eigen::MatrixXd P(4, 4); // Covariance matrix
-    P << 1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1;
-
-    Eigen::MatrixXd R(2, 2); // Measurement noise covariance matrix R (velocity)
-    R << 0.1, 0,
-        0, 0.1;
-
-    double T = 0.1; // Time step
-
-    double measurementNoise = 0.05; // Adjust this value based on the noise characteristics of your sensor
-
-    int steps = 30;
-
-    Eigen::MatrixXd trueVelocity = generateMotionData(steps, T, 0);
-    Eigen::MatrixXd noisyVelocity = generateRandomMeasurement(trueVelocity, measurementNoise);
-
-    std::ofstream file("generated_data.csv");
+void writeCsvFile(std::string fileName, int steps, double T, Eigen::MatrixXd velocityData) {
+    std::ofstream file(fileName);
     if (file.is_open()) {
         file << "time,position_x,position_y,velocity_x,velocity_y\n";
         double currentT = 0;
@@ -174,7 +183,7 @@ void kalmanFilter() {
             file << currentT;
             file << ",";
             for (int j = 0; j < 4; ++j) {
-                file << noisyVelocity(j, i);
+                file << velocityData(j, i);
                 if (j < 3) {
                     file << ",";
                 }
@@ -183,58 +192,64 @@ void kalmanFilter() {
             file << "\n";
         }
         file.close();
-        std::cout << "Generated data saved to 'generated_data.csv'\n";
+        std::cout << "Generated data saved to '" << fileName << "'\n";
     }
     else {
         std::cerr << "Unable to open file\n";
     }
+}
 
+Eigen::MatrixXd generateMotionData(int steps, double T, double noise) {
+    // Define CV model matrices
+    MotionModel motionModel = cvmodel(T, 1);
 
+    Eigen::VectorXd x(4); // State vector [position_x, position_y, velocity_x, velocity_y]
+    x << 0, 0, 1, 1;
 
-    /*
-    for (int i = 0; i < 5; ++i) { // Loop for a few iterations
-        // Prediction Step (Time Update)
-        x = calculateX(x, T);
-        P = calculateP(P, T);
+    Eigen::MatrixXd P = Eigen::MatrixXd::Identity(4, 4);
+    Eigen::MatrixXd data(4, steps);
 
-        // Generate simulated noisy velocity measurements
-
-
-        // Measurement Update Step
-        Eigen::VectorXd z = x.segment(2, 2) + Eigen::VectorXd::Random(2) * measurementNoise; // Simulated noisy measurement of velocity
-
-        Eigen::MatrixXd H(2, 4); // Measurement matrix for velocity
-        H << 0, 0, 1, 0,
-             0, 0, 0, 1;
-
-        Eigen::MatrixXd S = H * P * H.transpose() + R;
-        Eigen::MatrixXd K = P * H.transpose() * S.inverse();
-
-        x = x + K * (z - H * x);
-        P = (Eigen::MatrixXd::Identity(4, 4) - K * H) * P;
+    for (int i = 0; i < steps; ++i) {
+        // Prediction step (simulate motion)
+        x = motionModel.f(x);
+        // Add process noise to the state
+        for (int j = 0; j < x.size(); ++j) {
+            x(j) += noise * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
+        }
+        data.col(i) = x;
     }
-    */
-
-
+    return data;
 }
 
 int main() {
-    double T = 0.01;
-    double sigma = 0.1;
+    Eigen::VectorXd x_init(4); // State vector [position_x, position_y, velocity_x, velocity_y]
+    x_init << 0, 0, 1, 1;
 
-    MotionModel cv = cvmodel(T, sigma);
+    Eigen::MatrixXd P_init(4, 4); // Covariance matrix
+    P_init <<
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0;
 
-    // Example vector x for testing matrix-vector multiplication
-    Eigen::VectorXd x(4);
-    x << 1.0, 2.0, 3.0, 4.0;
+    double T = 0.01; // Time step
 
-    // Calculate F * x using the defined function f
-    Eigen::VectorXd result = cv.f(x);
+    double processNoise = 0.05; // Adjust this value based on the noise characteristics of your sensor
+    double measurementNoise = 0.05; // Adjust this value based on the noise characteristics of your sensor
 
-    // Display the result
-    std::cout << "Result of F * x: " << result.transpose() << std::endl;
+    int steps = 1000;
 
-    kalmanFilter(); // Call your Kalman Filter function here
+    MotionModel motionModel = cvmodel(T, processNoise);
+    SensorModel sensorModel = velocitySensorModel(T, measurementNoise);
+
+    Eigen::MatrixXd trueVelocity = generateMotionData(steps, T, 0);
+    Eigen::MatrixXd noisyVelocity = generateMeasurement(trueVelocity, measurementNoise);
+    Eigen::MatrixXd estimatedVelcity = runKalmanFilter(motionModel, sensorModel, noisyVelocity, x_init, P_init, steps);
+
+    writeCsvFile("dataGroundTruth.csv", steps, T, trueVelocity);
+    writeCsvFile("dataMeasured.csv", steps, T, noisyVelocity);
+    writeCsvFile("dataEstimated.csv", steps, T, estimatedVelcity);
+
 
     return 0;
 }
