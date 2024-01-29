@@ -31,17 +31,20 @@ struct SensorModel {
     int d1;
     int d2;
     Eigen::MatrixXd H;
+    std::function<Eigen::MatrixXd(Eigen::VectorXd)> H_nonlinear;
     Eigen::MatrixXd R;
     std::function<Eigen::VectorXd(Eigen::VectorXd)> h;
 
     // Constructor to set dimensions and initialize matrices
     SensorModel(int dimension1, int dimension2) : d1(dimension1), d2(dimension2), H(dimension2, dimension1), R(dimension2, dimension2) {
-        // Ensure that h has the correct size
-        h = [this](Eigen::VectorXd x) {
-            // Check if the input size matches d2
-            assert(x.size() == this->d2 && "Input size mismatch in function h");
 
-            // Placeholder implementation of h, you can replace it with your desired function
+        H_nonlinear = [this](Eigen::VectorXd x) {
+            assert(x.size() == this->d2 && "Input size mismatch in function h");
+            Eigen::VectorXd result = H * x;
+            return result;
+        };
+        h = [this](Eigen::VectorXd x) {
+            assert(x.size() == this->d2 && "Input size mismatch in function h");
             Eigen::VectorXd result = H * x;
             return result;
         };
@@ -60,6 +63,8 @@ public:
     Eigen::VectorXd vy;
     Eigen::VectorXd ax;
     Eigen::VectorXd ay;
+    Eigen::VectorXd r;
+    Eigen::VectorXd a;
 
     MotionData(int n) :
         lengthOfData(n),
@@ -69,13 +74,15 @@ public:
         vx(n),
         vy(n),
         ax(n),
-        ay(n) 
+        ay(n),
+        r(n),
+        a(n)
     {}
 };
 
 MotionModel cvmodel(double T, double sigma) {
     int d = 4;
-    
+
     MotionModel motionModel(d);
     motionModel.d = d;
 
@@ -85,13 +92,13 @@ MotionModel cvmodel(double T, double sigma) {
         0, 0, 1, 0,
         0, 0, 0, 1;
 
-    motionModel.f = [motionModel](Eigen::VectorXd x, double arg1 = 0, double arg2 = 0) {Eigen::VectorXd result = motionModel.F * x; return result;}; 
-    
+    motionModel.f = [motionModel](Eigen::VectorXd x, double arg1 = 0, double arg2 = 0) {Eigen::VectorXd result = motionModel.F * x; return result;};
+
     double T4 = T * T * T * T / 4;
     double T3 = T * T * T / 2;
     double T2 = T * T;
 
-    motionModel.Q << 
+    motionModel.Q <<
         T4, 0,  T3, 0,
         0,  T4, 0,  T3,
         T3, 0,  T2, 0,
@@ -103,7 +110,7 @@ MotionModel cvmodel(double T, double sigma) {
 
 MotionModel camodel(double T, double sigma) {
     int d = 6;
-    
+
     MotionModel motionModel(d);
     motionModel.d = d;
 
@@ -119,10 +126,10 @@ MotionModel camodel(double T, double sigma) {
         0, 0, 0, 0, 1, 0,
         0, 0, 0, 0, 0, 1;
 
-    motionModel.f = [motionModel](Eigen::VectorXd x, double arg1 = 0, double arg2 = 0) {Eigen::VectorXd result = motionModel.F * x; return result;}; 
-    
+    motionModel.f = [motionModel](Eigen::VectorXd x, double arg1 = 0, double arg2 = 0) {Eigen::VectorXd result = motionModel.F * x; return result;};
 
-    motionModel.Q << 
+
+    motionModel.Q <<
         T4, 0,  T3, 0, 0.5 * T2, 0,
         0,  T4, 0,  T3, 0, 0.5 * T2,
         T3, 0,  T2, 0, T, 0,
@@ -135,7 +142,7 @@ MotionModel camodel(double T, double sigma) {
     return motionModel;
 }
 
-MotionData fillDataFromCvModel(MotionData estimatedVelocity, Eigen::VectorXd x, int i) {
+MotionData fillDataFromCaModel(MotionData estimatedVelocity, Eigen::VectorXd x, int i) {
     estimatedVelocity.px[i] = x[0];
     estimatedVelocity.py[i] = x[1];
     estimatedVelocity.vx[i] = x[2];
@@ -157,7 +164,7 @@ SensorModel velocitySensorModel(double T, double sigma) {
     sensorModel.h = [sensorModel](Eigen::VectorXd x) -> Eigen::VectorXd {return sensorModel.H * x;};
 
     double sigma2 = sigma*sigma;
-    sensorModel.R << 
+    sensorModel.R <<
         sigma2, 0,
         0, sigma2;
 
@@ -178,7 +185,7 @@ SensorModel VASensorModel(double T, double sigma) {
     sensorModel.h = [sensorModel](Eigen::VectorXd x) -> Eigen::VectorXd {return sensorModel.H * x;};
 
     double sigma2 = sigma*sigma;
-    sensorModel.R << 
+    sensorModel.R <<
         sigma2, 0, 0, 0,
         0, sigma2, 0, 0,
         0, 0, sigma2, 0,
@@ -187,15 +194,49 @@ SensorModel VASensorModel(double T, double sigma) {
     return sensorModel;
 }
 
-MotionData generateMeasurement(int steps, MotionData unnoisyMeasurement, double noise) {
+SensorModel RadarSensorModel(double T, double sigma) {
+    int d1 = 6;
+    int d2 = 2;
+    SensorModel sensorModel(d2, d2);
+
+
+    sensorModel.H_nonlinear = [sensorModel](Eigen::MatrixXd x) -> Eigen::VectorXd {
+            Eigen::VectorXd z;
+            double r = x[0];
+            double theta = x[1];
+            z <<
+                cos(x[1]), sin(x[1]),
+                -x[0] * sin(x[1]);
+            return z;
+        };
+
+    sensorModel.h = [sensorModel](Eigen::VectorXd x) -> Eigen::VectorXd {
+            Eigen::VectorXd z;
+            z <<
+                x[0] * cos(x[1]),
+                x[0] * sin(x[1]);
+            return z;
+        };
+
+    double sigma2 = sigma*sigma;
+    sensorModel.R <<
+        sigma2, 0,
+        0, sigma2;
+
+    return sensorModel;
+}
+
+MotionData generateMeasurement(int steps, MotionData unnoisyMeasurement, Eigen::VectorXd noise) {
     MotionData noisyMeasurement = unnoisyMeasurement; // Initialize with true velocity
     for (int i = 0; i < steps; ++i) {
-        noisyMeasurement.px[i] = unnoisyMeasurement.px[i] + noise * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
-        noisyMeasurement.py[i] = unnoisyMeasurement.py[i] + noise * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
-        noisyMeasurement.vx[i] = unnoisyMeasurement.vx[i] + noise * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
-        noisyMeasurement.vy[i] = unnoisyMeasurement.vy[i] + noise * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
-        noisyMeasurement.ax[i] = unnoisyMeasurement.ax[i] + noise * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
-        noisyMeasurement.ay[i] = unnoisyMeasurement.ay[i] + noise * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
+        noisyMeasurement.px[i] = unnoisyMeasurement.px[i] + noise[0] * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
+        noisyMeasurement.py[i] = unnoisyMeasurement.py[i] + noise[1] * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
+        noisyMeasurement.vx[i] = unnoisyMeasurement.vx[i] + noise[2] * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
+        noisyMeasurement.vy[i] = unnoisyMeasurement.vy[i] + noise[3] * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
+        noisyMeasurement.ax[i] = unnoisyMeasurement.ax[i] + noise[4] * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
+        noisyMeasurement.ay[i] = unnoisyMeasurement.ay[i] + noise[5] * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
+        noisyMeasurement.r[i] = unnoisyMeasurement.r[i] + noise[6] * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
+        noisyMeasurement.a[i] = unnoisyMeasurement.a[i] + noise[7] * (2.0 * static_cast<double>(rand()) / RAND_MAX - 1.0);
     }
     return noisyMeasurement;
 }
@@ -293,7 +334,7 @@ struct KalmanFilter {
             Eigen::MatrixXd K = P * sensorModel.H.transpose() * S.inverse();
             x = x + K * y;
             P = (Eigen::MatrixXd::Identity(motionModel.d, motionModel.d) - K * sensorModel.H) * P;
-            estimatedData = fillDataFromCvModel(estimatedData, x, i);
+            estimatedData = fillDataFromCaModel(estimatedData, x, i);
             if (printEstimates) {
                 std::cout
                     << estimatedData.px[i] << ", "
@@ -308,20 +349,18 @@ struct KalmanFilter {
 };
 
 int main() {
+    int numberOfMeasurementTypes = 8;
     int stateSpaceSize = 6;
 
     Eigen::VectorXd x_init(stateSpaceSize); // State vector [px, py, vx, vy, ax, ay]
-    
 
     double T = 0.01; // Time step
-
     double processNoise = 0.1;
     double measurementNoise = 0.05;
-    double sensorNoise = 0.1;
-    bool printEstimates = true;
+    Eigen::VectorXd sensorNoise(numberOfMeasurementTypes);
+    sensorNoise << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 2;
+    bool printEstimates = false;
     int steps = 1000;
-
-
 
     if (stateSpaceSize == 4) {
         x_init << 0, 0, 0, 0;
@@ -329,7 +368,7 @@ int main() {
     if (stateSpaceSize == 6) {
         x_init << 0, 0, 0, 0, 0, 0;
     }
-    
+
     Eigen::MatrixXd P_init(stateSpaceSize, stateSpaceSize); // Covariance matrix
     for (int i = 0; i < stateSpaceSize; ++i) {
         for (int j = 0; j < stateSpaceSize; ++j) {
@@ -338,9 +377,10 @@ int main() {
     }
 
     MotionModel motionModel = camodel(T, processNoise);
-    
+
     //SensorModel sensorModel = velocitySensorModel(T, measurementNoise);
-    SensorModel sensorModel = VASensorModel(T, measurementNoise);
+    //SensorModel sensorModel = VASensorModel(T, measurementNoise);
+    SensorModel sensorModel = RadarSensorModel(T, measurementNoise);
 
     MotionData trueVelocity = generateMotionData(stateSpaceSize, steps, T, 0);
     writeCsvFile("dataGroundTruth.csv", steps, T, trueVelocity, stateSpaceSize);
