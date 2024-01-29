@@ -2,51 +2,45 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Read the CSV file into a pandas DataFrame
-trueVelocity = pd.read_csv(r"C:\Users\72419360\OneDrive - Sigma AB\Skrivbordet\GitHub\SensorFusionCpp\dataGroundTruth.csv")
-dataMeasuredVelocity = pd.read_csv(r"C:\Users\72419360\OneDrive - Sigma AB\Skrivbordet\GitHub\SensorFusionCpp\dataMeasured.csv")
-dataEstimatedVelcity = pd.read_csv(r"C:\Users\72419360\OneDrive - Sigma AB\Skrivbordet\GitHub\SensorFusionCpp\dataEstimated.csv")
+dataGroundTruth = pd.read_csv(r"C:\Users\72419360\Downloads\GitHub\SensorFusionCpp\dataGroundTruth.csv")
+dataMeasured = pd.read_csv(r"C:\Users\72419360\Downloads\GitHub\SensorFusionCpp\dataMeasured.csv")
+dataEstimated = pd.read_csv(r"C:\Users\72419360\Downloads\GitHub\SensorFusionCpp\dataEstimated.csv")
 
 # Plotting
 plt.figure(figsize=(10, 6))
-numberOfFigs = [2,3]
 
-
-# Plot position_x and position_y
-i = 1
-plt.subplot(numberOfFigs[0], numberOfFigs[1], i)
-plt.plot(trueVelocity['position_x'], trueVelocity['position_y'], label='True position')
-plt.plot(dataEstimatedVelcity['position_x'], dataEstimatedVelcity['position_y'], label='Estimated position')
-
-plt.title('Position over Time')
-plt.xlabel('x position')
-plt.ylabel('y position')
+"""
+numberOfFigs = [1,2]
+variable = 'ax'
+plt.subplot(numberOfFigs[0], numberOfFigs[1], 1)
+plt.plot(dataGroundTruth['time'], dataGroundTruth[variable], label='GroundTruth ' + variable)
 plt.legend()
-
-# Plot velocity_x and velocity_y
-i = i + 1
-plt.subplot(numberOfFigs[0], numberOfFigs[1], i)
-plt.plot(trueVelocity['time'], trueVelocity['velocity_x'], label='True X velocity')
-plt.plot(dataEstimatedVelcity['time'], dataEstimatedVelcity['velocity_y'], label='Estimated X velocity')
-plt.title('X velocity over Time')
-plt.xlabel('Time')
-plt.ylabel('Velocity')
+plt.subplot(numberOfFigs[0], numberOfFigs[1], 2)
+plt.plot(dataEstimated['time'], dataEstimated[variable], label='Estimated ' + variable)
 plt.legend()
+"""
 
-i = i + 1
-plt.subplot(numberOfFigs[0], numberOfFigs[1], i)
-plt.plot(trueVelocity['time'], abs(trueVelocity['velocity_x'] - dataEstimatedVelcity['velocity_x']), label='Error X velocity')
-plt.title('Error X velocity over Time')
-plt.xlabel('Time')
-plt.ylabel('Velocity')
-plt.legend()
 
-i = i + 1
-plt.subplot(numberOfFigs[0], numberOfFigs[1], i)
-plt.plot(trueVelocity['time'], abs(trueVelocity['velocity_y'] - dataEstimatedVelcity['velocity_y']), label='Error Y velocity')
-plt.title('Error Y velocity over Time')
-plt.xlabel('Time')
-plt.ylabel('Velocity')
-plt.legend()
+numberOfFigs = [3,3]
+plotstuff1 = ['px', 'py', 'vx', 'vy', 'ax', 'ay']
+for i, variable in enumerate(plotstuff1):
+    plt.subplot(numberOfFigs[0], numberOfFigs[1], i+1)
+    #plt.plot(dataGroundTruth['time'], dataGroundTruth[variable], label='GroundTruth ' + variable)
+    #plt.plot(dataEstimated['time'], dataEstimated[variable], label='Estimated ' + variable)
+    plt.plot(dataGroundTruth['time'], abs(dataGroundTruth[variable]-dataEstimated[variable]), label='error ' + variable)
+    plt.title(variable + ' over Time')
+    plt.legend()
+
+plotstuff2 = ['px', 'py', 'vx', 'vy', 'ax', 'ay']
+for i, variable in enumerate(plotstuff2):
+    plt.subplot(numberOfFigs[0], numberOfFigs[1], i+7)
+    plt.plot(dataMeasured['time'], dataMeasured[variable], label='GroundTruth ' + variable)
+    plt.plot(dataEstimated['time'], dataEstimated[variable], label='Estimated ' + variable)
+    plt.plot(dataGroundTruth['time'], abs(dataGroundTruth[variable]-dataEstimated[variable]), label='error ' + variable)
+    plt.title(variable + ' over Time')
+    plt.legend()
+
+
 
 # Adjust layout and show the plot
 plt.tight_layout()
