@@ -15,6 +15,7 @@ struct SensorModel {
             Eigen::MatrixXd result;
             return result;
         };
+
         h = [this](Eigen::VectorXd x) {
             assert(x.size() == this->d2 && "Input size mismatch in function h");
             Eigen::VectorXd result;
@@ -22,7 +23,6 @@ struct SensorModel {
         };
     }
 };
-
 
 SensorModel velocitySensorModel(double T, double sigma) {
     int d1 = 6;
@@ -37,7 +37,9 @@ SensorModel velocitySensorModel(double T, double sigma) {
         return H;
     };
 
-    sensorModel.h = [sensorModel](Eigen::VectorXd x) -> Eigen::VectorXd {return sensorModel.H(x) * x;};
+    sensorModel.h = [sensorModel](Eigen::VectorXd x) -> Eigen::VectorXd {
+        return sensorModel.H(x) * x;
+    };
 
     double sigma2 = sigma*sigma;
     sensorModel.R <<

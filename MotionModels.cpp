@@ -1,7 +1,6 @@
 #include <Eigen/Dense>
 #include <functional>
 
-
 struct MotionModel {
     int d;
     Eigen::MatrixXd F;
@@ -92,7 +91,6 @@ MotionModel camodel(double T, double sigma) {
         0, 0, 0, 0, 0, 1;
 
     motionModel.f = [motionModel](Eigen::VectorXd x, double arg1 = 0, double arg2 = 0) {Eigen::VectorXd result = motionModel.F * x; return result;};
-
 
     motionModel.Q <<
         T4, 0,  T3, 0, 0.5 * T2, 0,
