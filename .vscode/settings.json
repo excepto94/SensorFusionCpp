@@ -86,6 +86,7 @@
         "fft": "cpp",
         "*.inc": "cpp",
         "coroutine": "cpp",
-        "resumable": "cpp"
+        "resumable": "cpp",
+        "dense": "cpp"
     }
 }
