@@ -5,19 +5,12 @@ struct MotionModel {
     int d;
     Eigen::MatrixXd F;
     Eigen::MatrixXd Q;
-    std::function<Eigen::VectorXd(Eigen::VectorXd, double, double)> f;
+    std::function<Eigen::VectorXd(Eigen::VectorXd)> f;
 
-    // Constructor to set dimensions and initialize matrices
     MotionModel(int dimension) : d(dimension), F(dimension, dimension), Q(dimension, dimension) {
-        // Ensure that f has the correct size
-        f = [this](Eigen::VectorXd x, double arg1 = 0.0, double arg2 = 0.0) {
-            // Check if the input size matches d
+        f = [this](Eigen::VectorXd x) {
             assert(x.size() == this->d && "Input size mismatch in function f");
-
-            // Placeholder implementation of f, you can replace it with your desired function
-            Eigen::VectorXd result = F * x;
-
-            return result;
+            return F * x;
         };
     }
 };
@@ -32,14 +25,14 @@ MotionModel cpmodel(double T, double sigma) {
         1, 0,
         0, 1;
 
-    motionModel.f = [motionModel](Eigen::VectorXd x, double arg1 = 0, double arg2 = 0) {Eigen::VectorXd result = motionModel.F * x; return result;};
+    motionModel.f = [motionModel](Eigen::VectorXd x) {Eigen::VectorXd result = motionModel.F * x; return result;};
 
     double T2 = T * T;
 
     motionModel.Q <<
         T2, 0,
         0,  T2;
-    motionModel.Q = motionModel.Q * sigma;
+    motionModel.Q *= sigma;
 
     return motionModel;
 }
@@ -56,7 +49,7 @@ MotionModel cvmodel(double T, double sigma) {
         0, 0, 1, 0,
         0, 0, 0, 1;
 
-    motionModel.f = [motionModel](Eigen::VectorXd x, double arg1 = 0, double arg2 = 0) {Eigen::VectorXd result = motionModel.F * x; return result;};
+    motionModel.f = [motionModel](Eigen::VectorXd x) {Eigen::VectorXd result = motionModel.F * x; return result;};
 
     double T4 = T * T * T * T / 4;
     double T3 = T * T * T / 2;
@@ -90,7 +83,7 @@ MotionModel camodel(double T, double sigma) {
         0, 0, 0, 0, 1, 0,
         0, 0, 0, 0, 0, 1;
 
-    motionModel.f = [motionModel](Eigen::VectorXd x, double arg1 = 0, double arg2 = 0) {Eigen::VectorXd result = motionModel.F * x; return result;};
+    motionModel.f = [motionModel](Eigen::VectorXd x) {Eigen::VectorXd result = motionModel.F * x; return result;};
 
     motionModel.Q <<
         T4, 0,  T3, 0, 0.5 * T2, 0,

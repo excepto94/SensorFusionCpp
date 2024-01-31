@@ -1,4 +1,5 @@
 #include <Eigen/Dense>
+#include "MotionData.hpp"
 
 struct SensorModel {
     int d1;
@@ -6,6 +7,7 @@ struct SensorModel {
     std::function<Eigen::MatrixXd(Eigen::VectorXd)> H;
     Eigen::MatrixXd R;
     std::function<Eigen::VectorXd(Eigen::VectorXd)> h;
+    std::function<Eigen::VectorXd(MotionData, int)> getRelevantMeasurements;
 
     // Constructor to set dimensions and initialize matrices
     SensorModel(int dimension1, int dimension2) : d1(dimension1), d2(dimension2), R(dimension2, dimension2) {
@@ -19,6 +21,11 @@ struct SensorModel {
         h = [this](Eigen::VectorXd x) {
             assert(x.size() == this->d2 && "Input size mismatch in function h");
             Eigen::VectorXd result;
+            return result;
+        };
+
+        getRelevantMeasurements = [this](MotionData measurement, int i) {
+            Eigen::VectorXd result(d2);
             return result;
         };
     }
@@ -39,6 +46,12 @@ SensorModel velocitySensorModel(double T, double sigma) {
 
     sensorModel.h = [sensorModel](Eigen::VectorXd x) -> Eigen::VectorXd {
         return sensorModel.H(x) * x;
+    };
+    
+    sensorModel.getRelevantMeasurements = [sensorModel](MotionData measurement, int i) -> Eigen::VectorXd {
+        Eigen::VectorXd relevantMeasurements(sensorModel.d2);
+        relevantMeasurements << measurement.vx[i], measurement.vy[i];
+        return relevantMeasurements;
     };
 
     double sigma2 = sigma*sigma;
@@ -72,6 +85,12 @@ SensorModel VASensorModel(double T, double sigma) {
             0, 0, 0, 0, 1, 0,
             0, 0, 0, 0, 0, 1;
         return H * x;
+    };
+
+    sensorModel.getRelevantMeasurements = [sensorModel](MotionData measurement, int i) -> Eigen::VectorXd {
+        Eigen::VectorXd relevantMeasurements(sensorModel.d2);
+        relevantMeasurements << measurement.vx[i], measurement.vy[i], measurement.ax[i], measurement.ay[i];
+        return relevantMeasurements;
     };
 
     double sigma2 = sigma*sigma;
@@ -111,6 +130,12 @@ SensorModel RadarSensorModelCp(double T, double sigma) {
         return z;
     };
 
+    sensorModel.getRelevantMeasurements = [sensorModel](MotionData measurement, int i) -> Eigen::VectorXd {
+        Eigen::VectorXd relevantMeasurements(sensorModel.d2);
+        relevantMeasurements << measurement.r[i], measurement.a[i];
+        return relevantMeasurements;
+    };
+
     double sigma2 = sigma*sigma;
     sensorModel.R <<
         sigma2, 0,
@@ -144,6 +169,12 @@ SensorModel RadarSensorModelCa(double T, double sigma) {
             sqrt(px * px + py * py),
             atan2(py, px);
         return z;
+    };
+
+    sensorModel.getRelevantMeasurements = [sensorModel](MotionData measurement, int i) -> Eigen::VectorXd {
+        Eigen::VectorXd relevantMeasurements(sensorModel.d2);
+        relevantMeasurements << measurement.r[i], measurement.a[i];
+        return relevantMeasurements;
     };
 
     double sigma2 = sigma*sigma;

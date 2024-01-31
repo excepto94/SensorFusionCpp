@@ -3,8 +3,10 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**",
-                "${workspaceFolder}/external/Eigen"
+                "${workspaceFolder}/include/**",
+                "${workspaceFolder}/src/**",
+                "${workspaceFolder}/external/Eigen",
+                "${workspaceFolder}"
             ],
             "defines": [
                 "_DEBUG",
