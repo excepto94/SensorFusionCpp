@@ -1,5 +1,4 @@
-#ifndef MOTION_MODEL_HPP
-#define MOTION_MODEL_HPP
+#pragma once
 
 #include <Eigen/Dense>
 #include <functional>
@@ -18,5 +17,3 @@ MotionModel cpmodel(double T, double sigma);
 MotionModel cvmodel(double T, double sigma);
 
 MotionModel camodel(double T, double sigma);
-
-#endif // MOTION_MODEL_HPP

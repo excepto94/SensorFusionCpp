@@ -6,7 +6,7 @@
 #include <fstream>
 #include <iomanip> 
 
-#include "../include/MotionData.hpp"
+#include <MotionData.hpp>
 
 void writeCsvFile(std::string fileName, int steps, double dT, MotionData dataToWrite, int numberOfStates) {
     std::ofstream file(fileName);

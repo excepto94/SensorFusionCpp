@@ -1,7 +1,8 @@
-#include "../include/MotionModel.hpp"
-#include "../include/SensorModel.hpp"
-#include "../include/MotionData.hpp"
+#include <MotionModel.hpp>
+#include <SensorModel.hpp>
+#include <MotionData.hpp>
 #include <iostream>
+#include <Eigen/Dense>
 
 struct KalmanFilter {
     MotionModel motionModel;

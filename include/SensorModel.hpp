@@ -1,9 +1,8 @@
-#ifndef SENSOR_MODEL_HPP
-#define SENSOR_MODEL_HPP
+#pragma once
 
 #include <Eigen/Dense>
 #include <functional>
-#include "MotionData.hpp"
+#include <MotionData.hpp>
 
 struct SensorModel {
     int d1;
@@ -42,5 +41,3 @@ SensorModel VASensorModel(double T, double sigma);
 SensorModel RadarSensorModelCp(double T, double sigma);
 
 SensorModel RadarSensorModelCa(double T, double sigma);
-
-#endif // SENSOR_MODEL_HPP

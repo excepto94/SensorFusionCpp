@@ -1,5 +1,4 @@
-#ifndef MOTION_DATA_HPP
-#define MOTION_DATA_HPP
+#pragma once
 
 #include <Eigen/Dense>
 
@@ -37,5 +36,3 @@ MotionData fillDataFromCaModel(MotionData estimatedVelocity, Eigen::VectorXd x, 
 MotionData generateMeasurement(int steps, MotionData unnoisyMeasurement, Eigen::VectorXd noise);
 
 MotionData generateMotionData(int steps, double T);
-
-#endif // MOTION_DATA_HPP

@@ -1,10 +1,11 @@
-#ifndef KALMAN_FILTER_HPP
-#define KALMAN_FILTER_HPP
+#pragma once
 
-#include "MotionModel.hpp"
-#include "SensorModel.hpp"
-#include "MotionData.hpp"
+#include <MotionModel.hpp>
+#include <SensorModel.hpp>
+#include <MotionData.hpp>
 #include <iostream>
+#include <Eigen/Dense>
+
 
 struct KalmanFilter {
     MotionModel motionModel;
@@ -16,5 +17,3 @@ struct KalmanFilter {
 
     void estimate(MotionData measurement, Eigen::VectorXd x, Eigen::MatrixXd P, int steps, bool printEstimates);
 };
-
-#endif // KALMAN_FILTER_HPP

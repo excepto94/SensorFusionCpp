@@ -6,12 +6,11 @@
 #include <fstream>
 #include <iomanip> 
 
-#include "../include/MotionData.hpp"
-#include "../include/SensorModel.hpp"
-#include "../include/KalmanFilter.hpp"
-#include "../include/MotionModel.hpp"
-#include "../include/MiscFunctions.hpp"
-
+#include <MotionData.hpp>
+#include <SensorModel.hpp>
+#include <KalmanFilter.hpp>
+#include <MotionModel.hpp>
+#include <MiscFunctions.hpp>
 
 int main() {
     int numberOfMeasurementTypes = 8;

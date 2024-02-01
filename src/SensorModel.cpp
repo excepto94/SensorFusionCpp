@@ -1,5 +1,5 @@
 #include <Eigen/Dense>
-#include "MotionData.hpp"
+#include <MotionData.hpp>
 
 struct SensorModel {
     int d1;

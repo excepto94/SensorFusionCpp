@@ -1,5 +1,5 @@
 #include <Eigen/Dense>
-#include "../include/MotionModel.hpp"
+#include <MotionModel.hpp>
 
 struct MotionData {
 protected:

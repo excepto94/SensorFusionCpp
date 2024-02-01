@@ -10,6 +10,7 @@
                 "/nologo",
                 "/Fe${fileDirname}\\${fileBasenameNoExtension}.exe",
                 "-I${workspaceFolder}/external/Eigen",
+                "${workspaceFolder}/src/*.cpp",
                 "${file}"
             ],
             "options": {
